@@ -27,6 +27,16 @@ from . import defaults
 
 console = bittensor.__console__
 
+API_URL = "https://api.taomarketcap.com/graphql"
+
+TOTAL_NETWORKS_QUERY = """
+query MyQuery {
+  totalNetworks(limit: 1) {
+    value
+  }
+}
+"""
+
 
 class IntListPrompt(PromptBase):
     """Prompt for a list of integers."""
@@ -49,7 +59,11 @@ def check_netuid_set(
     allow_none: bool = False,
 ):
     if subtensor.network != "nakamoto":
-        all_netuids = [str(netuid) for netuid in subtensor.get_subnets()]
+        response = requests.post(
+            url=API_URL, json={"query": TOTAL_NETWORKS_QUERY}
+        ).json()
+        total_networks = response["data"]["totalNetworks"][0]["value"]
+        all_netuids = [str(i) for i in range(int(total_networks))]
         if len(all_netuids) == 0:
             console.print(":cross_mark:[red]There are no open networks.[/red]")
             sys.exit()

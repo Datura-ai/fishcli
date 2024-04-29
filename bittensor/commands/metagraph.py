@@ -23,12 +23,10 @@ from rich.table import Table
 
 from bittensor.commands.models.subnets import FetchMetagraphData
 from bittensor.utils import U16_NORMALIZED_FLOAT
-from .utils import check_netuid_set
+from .utils import API_URL, check_netuid_set
 
 console = bittensor.__console__  # type: ignore
 
-
-API_URL = "https://api.taomarketcap.com/graphql"
 
 FETCH_SUBNETS_QUERY = """
 query FetchSubnets($netUid: [Int!]!) {
@@ -362,11 +360,9 @@ class MetagraphCommand:
 
     @staticmethod
     def check_config(config: "bittensor.config"):
-        # TODO ckeck netuid with GQL
-        # check_netuid_set(
-        #     config, subtensor=bittensor.subtensor(config=config, log_verbose=False)
-        # )
-        pass
+        check_netuid_set(
+            config, subtensor=bittensor.subtensor(config=config, log_verbose=False)
+        )
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
