@@ -30,7 +30,7 @@ console = bittensor.__console__
 API_URL = "https://api.taomarketcap.com/graphql"
 
 TOTAL_NETWORKS_QUERY = """
-query MyQuery {
+query TotalNetworks {
   totalNetworks(limit: 1) {
     value
   }
