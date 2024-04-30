@@ -8,16 +8,44 @@ query TotalNetworks {
 }
 """
 
+FETCH_SUBNETS_VALUES_QUERY = """
+query FetchSubnetsValues {
+  subnets {
+    totalUids(limit: 1) {
+      value
+    }
+    tempo(limit: 1) {
+      value
+    }
+    burn(limit: 1) {
+      value
+    }
+    difficulty(limit: 1) {
+      value
+    }
+    subnetOwner(limit: 1) {
+      value
+    }
+    maxAllowedUids(limit: 1) {
+      value
+    }
+    emissionValues(limit: 1) {
+      value
+    }
+    netUid
+  }
+}
+"""
+
 
 FETCH_METAGRAPH_QUERY = """
 query FetchSubnets($netUid: [Int!]!) {
   subnets(netUid: $netUid) {
     uids {
-      stake(limit: 1) {
+      stake {
         data {
           value
         }
-        uid
       }
       rank(limit: 1) {
         uid
@@ -29,10 +57,8 @@ query FetchSubnets($netUid: [Int!]!) {
         data {
           value
         }
-        uid
       }
       consensus(limit: 1) {
-        uid
         data {
           value
         }
@@ -41,10 +67,8 @@ query FetchSubnets($netUid: [Int!]!) {
         data {
           value
         }
-        uid
       }
       dividends(limit: 1) {
-        uid
         data {
           value
         }
@@ -53,47 +77,39 @@ query FetchSubnets($netUid: [Int!]!) {
         data {
           value
         }
-        uid
       }
       validatorTrust(limit: 1) {
         data {
           value
         }
-        uid
       }
       axons(limit: 1) {
         data {
           value
         }
-        uid
       }
       active(limit: 1) {
         data {
           value
         }
-        uid
       }
       lastUpdate(limit: 1) {
         data {
           value
         }
-        uid
       }
       coldkey(limit: 1) {
         data {
           value
         }
-        uid
       }
-      validatorPermit {
+      validatorPermit(limit: 1) {
         data {
           value
         }
-        uid
       }
       hotkey {
         key
-        uid
       }
     }
     difficulty(limit: 1) {

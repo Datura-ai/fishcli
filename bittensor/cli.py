@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import sys
+import time
 import shtab
 import argparse
 import bittensor
@@ -226,7 +227,8 @@ class cli:
         """
         # Turns on console for cli.
         bittensor.turn_console_on()
-
+        global start_time
+        start_time = time.time()
         # If no config is provided, create a new one from args.
         if config is None:
             config = cli.create_config(args)
@@ -368,3 +370,7 @@ class cli:
                 f":cross_mark:[red]Unknown command: {self.config.command}[/red]"
             )
             sys.exit()
+        end_time = time.time()
+        bittensor.__console__.print(
+            f"[yellow]Command execution time: {end_time - start_time} seconds"
+        )

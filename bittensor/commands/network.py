@@ -16,18 +16,18 @@
 # DEALINGS IN THE SOFTWARE.
 
 import argparse
-import requests
 import bittensor
 from bittensor.commands.queries import (
-    API_URL,
     FETCH_HYPERPARAMETERS_QUERY,
-    TOTAL_NETWORKS_QUERY,
+    FETCH_SUBNETS_VALUES_QUERY,
 )
+from bittensor.utils.balance import Balance
+
 from . import defaults
 from rich.prompt import Prompt
 from rich.table import Table
 from typing import List, Optional, Dict
-from .utils import get_delegates_details, DelegatesDetails, check_netuid_set
+from .utils import call_gql, get_delegates_details, DelegatesDetails, check_netuid_set
 from .identity import SetIdentityCommand
 
 console = bittensor.__console__
@@ -232,38 +232,40 @@ class SubnetListCommand:
     def run(cli: "bittensor.cli"):
         r"""List all subnet netuids in the network."""
         try:
-            subtensor: "bittensor.subtensor" = bittensor.subtensor(
-                config=cli.config, log_verbose=False
-            )
-            SubnetListCommand._run(cli, subtensor)
-        finally:
-            if "subtensor" in locals():
-                subtensor.close()
-                bittensor.logging.debug("closing subtensor connection")
+            response = call_gql(FETCH_SUBNETS_VALUES_QUERY)
+            subnets_data = response.json()["data"]["subnets"]
+            SubnetListCommand._run(cli, subnets_data)
+        except Exception as e:
+            bittensor.logging.exception(f"An error occurred: {e}")
 
     @staticmethod
-    def _run(cli: "bittensor.cli", subtensor: "bittensor.subtensor"):
+    def _run(cli: "bittensor.cli", subnets_data):
         r"""List all subnet netuids in the network."""
-        subnets: List[bittensor.SubnetInfo] = subtensor.get_all_subnets_info()
-
         rows = []
         total_neurons = 0
-        delegate_info: Optional[Dict[str, DelegatesDetails]] = get_delegates_details(
-            url=bittensor.__delegates_details_url__
-        )
 
-        for subnet in subnets:
-            total_neurons += subnet.max_n
+        for subnet in subnets_data:
+            total_neurons += int(subnet["maxAllowedUids"][0]["value"])
+            emisson_value = int(subnet["emissionValues"][0]["value"])
+            burn = Balance.from_rao(int(subnet["burn"][0]["value"]))
             rows.append(
                 (
-                    str(subnet.netuid),
-                    str(subnet.subnetwork_n),
-                    str(bittensor.utils.formatting.millify(subnet.max_n)),
-                    f"{subnet.emission_value / bittensor.utils.RAOPERTAO * 100:0.2f}%",
-                    str(subnet.tempo),
-                    f"{subnet.burn!s:8.8}",
-                    str(bittensor.utils.formatting.millify(subnet.difficulty)),
-                    f"{delegate_info[subnet.owner_ss58].name if subnet.owner_ss58 in delegate_info else subnet.owner_ss58}",
+                    str(subnet["netUid"]),
+                    str(subnet["totalUids"][0]["value"]),
+                    str(
+                        bittensor.utils.formatting.millify(
+                            subnet["maxAllowedUids"][0]["value"]
+                        )
+                    ),
+                    f"{emisson_value / bittensor.utils.RAOPERTAO * 100:0.2f}%",
+                    str(subnet["tempo"][0]["value"]),
+                    f"{burn!s:8.8}",
+                    str(
+                        bittensor.utils.formatting.millify(
+                            subnet["difficulty"][0]["value"]
+                        )
+                    ),
+                    str(subnet["subnetOwner"][0]["value"]),
                 )
             )
         table = Table(
@@ -273,10 +275,10 @@ class SubnetListCommand:
             box=None,
             show_edge=True,
         )
-        table.title = "[white]Subnets - {}".format(subtensor.network)
+        table.title = "[white]Subnets - {}".format("finney")
         table.add_column(
             "[overline white]NETUID",
-            str(len(subnets)),
+            str(len(subnets_data)),
             footer_style="overline white",
             style="bold green",
             justify="center",
@@ -467,12 +469,8 @@ class SubnetHyperparamsCommand:
     def run(cli: "bittensor.cli"):
         r"""View hyperparameters of a subnetwork."""
         try:
-            response = requests.post(
-                url=API_URL,
-                json={
-                    "query": FETCH_HYPERPARAMETERS_QUERY,
-                    "variables": {"netUid": cli.config.netuid},
-                },
+            response = call_gql(
+                FETCH_HYPERPARAMETERS_QUERY, {"netUid": cli.config.netuid}
             )
             hyperparams_data = response.json()["data"]["subnets"][0]
             SubnetHyperparamsCommand._run(cli, hyperparams_data)
@@ -631,12 +629,8 @@ class SubnetGetHyperparamsCommand:
     def run(cli: "bittensor.cli"):
         r"""View hyperparameters of a subnetwork."""
         try:
-            response = requests.post(
-                url=API_URL,
-                json={
-                    "query": FETCH_HYPERPARAMETERS_QUERY,
-                    "variables": {"netUid": cli.config.netuid},
-                },
+            response = call_gql(
+                FETCH_HYPERPARAMETERS_QUERY, {"netUid": cli.config.netuid}
             )
             hyperparams_data = response.json()["data"]["subnets"][0]
             SubnetHyperparamsCommand._run(cli, hyperparams_data)

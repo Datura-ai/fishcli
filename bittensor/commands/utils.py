@@ -17,6 +17,7 @@
 
 import sys
 import os
+import time
 import torch
 import bittensor
 from typing import List, Dict, Any, Optional
@@ -51,17 +52,16 @@ def check_netuid_set(
     allow_none: bool = False,
 ):
     if subtensor.network != "nakamoto":
-        response = requests.post(
-            url=API_URL, json={"query": TOTAL_NETWORKS_QUERY}
-        ).json()
-        total_networks = response["data"]["totalNetworks"][0]["value"]
-        all_netuids = [str(i) for i in range(int(total_networks))]
-        if len(all_netuids) == 0:
-            console.print(":cross_mark:[red]There are no open networks.[/red]")
-            sys.exit()
-
         # Make sure netuid is set.
         if not config.is_set("netuid"):
+            response = requests.post(
+                url=API_URL, json={"query": TOTAL_NETWORKS_QUERY}
+            ).json()
+            total_networks = response["data"]["totalNetworks"][0]["value"]
+            all_netuids = [str(i) for i in range(int(total_networks))]
+            if len(all_netuids) == 0:
+                console.print(":cross_mark:[red]There are no open networks.[/red]")
+                sys.exit()
             if not config.no_prompt:
                 netuid = IntListPrompt.ask(
                     "Enter netuid", choices=all_netuids, default=str(all_netuids[0])
@@ -198,6 +198,22 @@ def filter_netuids_by_registered_hotkeys(
         netuids.extend(netuids_with_registered_hotkeys)
 
     return list(set(netuids))
+
+
+def call_gql(query: str, variables: dict = None) -> requests.Response:
+    start_time = time.time()
+    response = requests.post(
+        url=API_URL,
+        json={
+            "query": query,
+            "variables": variables,
+        },
+    )
+    end_time = time.time()
+    bittensor.__console__.print(
+        f"[yellow]GraphQL query execution time: {end_time - start_time} seconds"
+    )
+    return response
 
 
 @dataclass

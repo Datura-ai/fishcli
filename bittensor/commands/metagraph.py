@@ -18,13 +18,11 @@
 import argparse
 import json
 import bittensor
-import requests
 from rich.table import Table
 
-from bittensor.commands.models.fetch_metagraph import FetchMetagraphData
-from bittensor.commands.queries import API_URL, FETCH_METAGRAPH_QUERY
+from bittensor.commands.queries import FETCH_METAGRAPH_QUERY
 from bittensor.utils import U16_NORMALIZED_FLOAT
-from .utils import check_netuid_set
+from .utils import call_gql, check_netuid_set
 
 console = bittensor.__console__  # type: ignore
 
@@ -76,33 +74,27 @@ class MetagraphCommand:
     """
 
     @staticmethod
-    def run(cli: "bittensor.cli"):
+    def run(cli):
         r"""Prints an entire metagraph."""
         try:
-            response = requests.post(
-                url=API_URL,
-                json={
-                    "query": FETCH_METAGRAPH_QUERY,
-                    "variables": {"netUid": cli.config.netuid},
-                },
-            )
-            metagraph_data = FetchMetagraphData.validate(response.json())
+            response = call_gql(FETCH_METAGRAPH_QUERY, {"netUid": cli.config["netuid"]})
+            metagraph_data = response.json()
             MetagraphCommand._run(cli, metagraph_data)
         except Exception as e:
             bittensor.logging.exception(f"An error occurred: {e}")
 
-    def _run(cli: "bittensor.cli", metagraph_data: FetchMetagraphData):
+    def _run(cli, metagraph_data):
         r"""Prints an entire metagraph."""
         console = bittensor.__console__
 
         # TODO fix it
         network = "finney"
 
-        difficulty = metagraph_data.data.subnets[0].difficulty[0].value
+        difficulty = metagraph_data["data"]["subnets"][0]["difficulty"][0]["value"]
         total_issuance = bittensor.Balance.from_rao(
-            int(metagraph_data.data.totalIssuance[0].value)
+            int(metagraph_data["data"]["totalIssuance"][0]["value"])
         )
-        uids = metagraph_data.data.subnets[0].uids
+        uids = metagraph_data["data"]["subnets"][0]["uids"]
         TABLE_DATA = []
         total_stake = 0
         total_rank = 0
@@ -113,58 +105,71 @@ class MetagraphCommand:
         total_dividends = 0
         total_emission = 0
         total_active = 0
-        for item in uids.rank:
-            uid = item.uid
-            active = uids.active[uid].data[0].value
-            axons = json.loads(uids.axons[uid].data[0].value)
-            stake = int(uids.stake[uid].data[0].value) / 1000000000
+        for uid in uids["rank"]:
+            active = uids["active"][uid["uid"]]["data"][0]["value"]
+            axons = json.loads(uids["axons"][uid["uid"]]["data"][0]["value"])
+            stake = int(uids["stake"][uid["uid"]]["data"][0]["value"]) / 1000000000
             row = [
-                str(uid),
+                str(uid["uid"]),
                 "{:.5f}".format(stake),
                 "{:.5f}".format(
-                    U16_NORMALIZED_FLOAT(int(uids.rank[uid].data[0].value))
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["rank"][uid["uid"]]["data"][0]["value"])
+                    )
                 ),
                 "{:.5f}".format(
-                    U16_NORMALIZED_FLOAT(int(uids.trust[uid].data[0].value))
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["trust"][uid["uid"]]["data"][0]["value"])
+                    )
                 ),
                 "{:.5f}".format(
-                    U16_NORMALIZED_FLOAT(int(uids.consensus[uid].data[0].value))
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["consensus"][uid["uid"]]["data"][0]["value"])
+                    )
                 ),
                 "{:.5f}".format(
-                    U16_NORMALIZED_FLOAT(int(uids.incentive[uid].data[0].value))
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["incentive"][uid["uid"]]["data"][0]["value"])
+                    )
                 ),
                 "{:.5f}".format(
-                    U16_NORMALIZED_FLOAT(int(uids.dividends[uid].data[0].value))
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["dividends"][uid["uid"]]["data"][0]["value"])
+                    )
                 ),
-                "{}".format(int(uids.emission[uid].data[0].value)),
+                "{}".format(int(uids["emission"][uid["uid"]]["data"][0]["value"])),
                 "{:.5f}".format(
-                    U16_NORMALIZED_FLOAT(int(uids.validatorTrust[uid].data[0].value))
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["validatorTrust"][uid["uid"]]["data"][0]["value"])
+                    )
                 ),
-                "*" if uids.validatorPermit[uid].data[0].value else "",
-                str(uids.lastUpdate[uid].data[0].value),
+                "*" if uids["validatorPermit"][uid["uid"]]["data"][0]["value"] else "",
+                str(uids["lastUpdate"][uid["uid"]]["data"][0]["value"]),
                 str(1 if active else 0),
                 ("{ip}:{port}".format(**axons) if axons else "[yellow]none[/yellow]"),
-                uids.hotkey[uid].key[:10],
-                uids.coldkey[uid].data[0].value[:10],
+                uids["hotkey"][uid["uid"]]["key"][:10],
+                uids["coldkey"][uid["uid"]]["data"][0]["value"][:10],
             ]
             total_stake += stake
-            total_rank += int(uids.rank[uid].data[0].value)
-            total_validator_trust += int(uids.validatorTrust[uid].data[0].value)
-            total_trust += int(uids.trust[uid].data[0].value)
-            total_consensus += int(uids.consensus[uid].data[0].value)
-            total_incentive += int(uids.incentive[uid].data[0].value)
-            total_dividends += int(uids.dividends[uid].data[0].value)
-            total_emission += int(uids.emission[uid].data[0].value)
+            total_rank += int(uids["rank"][uid["uid"]]["data"][0]["value"])
+            total_validator_trust += int(
+                uids["validatorTrust"][uid["uid"]]["data"][0]["value"]
+            )
+            total_trust += int(uids["trust"][uid["uid"]]["data"][0]["value"])
+            total_consensus += int(uids["consensus"][uid["uid"]]["data"][0]["value"])
+            total_incentive += int(uids["incentive"][uid["uid"]]["data"][0]["value"])
+            total_dividends += int(uids["dividends"][uid["uid"]]["data"][0]["value"])
+            total_emission += int(uids["emission"][uid["uid"]]["data"][0]["value"])
             total_active += 1 if active else 0
             TABLE_DATA.append(row)
-        total_neurons = len(uids.rank)
+        total_neurons = len(uids["rank"])
         table = Table(show_footer=False)
         table.title = "[white]Metagraph: net: {}:{}, block: {}, N: {}/{}, stake: {}, issuance: {}, difficulty: {}".format(
             network,
-            cli.config.netuid,
-            metagraph_data.data.totalIssuance[0].blockNumber,
+            cli.config["netuid"],
+            metagraph_data["data"]["totalIssuance"][0]["blockNumber"],
             total_active,
-            len(uids.rank),
+            len(uids["rank"]),
             bittensor.Balance.from_tao(total_stake),
             total_issuance,
             difficulty,
@@ -262,9 +267,7 @@ class MetagraphCommand:
 
     @staticmethod
     def check_config(config: "bittensor.config"):
-        check_netuid_set(
-            config, subtensor=bittensor.subtensor(config=config, log_verbose=False)
-        )
+        pass
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):

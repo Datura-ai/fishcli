@@ -9,7 +9,6 @@ class Datum(BaseModel):
 
 class Stake(BaseModel):
     data: List[Datum]
-    uid: int
 
 
 class Rank(BaseModel):
@@ -19,37 +18,30 @@ class Rank(BaseModel):
 
 class Trust(BaseModel):
     data: List[Datum]
-    uid: int
 
 
 class Consensus(BaseModel):
-    uid: int
     data: List[Datum]
 
 
 class Incentive(BaseModel):
     data: List[Datum]
-    uid: int
 
 
 class Dividend(BaseModel):
-    uid: int
     data: List[Datum]
 
 
 class Emission(BaseModel):
     data: List[Datum]
-    uid: int
 
 
 class ValidatorTrust(BaseModel):
     data: List[Datum]
-    uid: int
 
 
 class Axon(BaseModel):
     data: List[Datum]
-    uid: int
 
 
 class BoolData(BaseModel):
@@ -58,27 +50,22 @@ class BoolData(BaseModel):
 
 class Active(BaseModel):
     data: List[BoolData]
-    uid: int
 
 
 class LastUpdate(BaseModel):
     data: List[Datum]
-    uid: int
 
 
 class Coldkey(BaseModel):
     data: List[Datum]
-    uid: int
 
 
 class ValidatorPermit(BaseModel):
     data: List[BoolData]
-    uid: int
 
 
 class HotKey(BaseModel):
     key: str
-    uid: int
 
 
 class Uids(BaseModel):
