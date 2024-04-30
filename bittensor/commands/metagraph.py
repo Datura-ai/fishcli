@@ -21,110 +21,12 @@ import bittensor
 import requests
 from rich.table import Table
 
-from bittensor.commands.models.subnets import FetchMetagraphData
+from bittensor.commands.models.fetch_metagraph import FetchMetagraphData
+from bittensor.commands.queries import API_URL, FETCH_METAGRAPH_QUERY
 from bittensor.utils import U16_NORMALIZED_FLOAT
-from .utils import API_URL, check_netuid_set
+from .utils import check_netuid_set
 
 console = bittensor.__console__  # type: ignore
-
-
-FETCH_SUBNETS_QUERY = """
-query FetchSubnets($netUid: [Int!]!) {
-  subnets(netUid: $netUid) {
-    uids {
-      stake(limit: 1) {
-        data {
-          value
-        }
-        uid
-      }
-      rank(limit: 1) {
-        uid
-        data {
-          value
-        }
-      }
-      trust(limit: 1) {
-        data {
-          value
-        }
-        uid
-      }
-      consensus(limit: 1) {
-        uid
-        data {
-          value
-        }
-      }
-      incentive(limit: 1) {
-        data {
-          value
-        }
-        uid
-      }
-      dividends(limit: 1) {
-        uid
-        data {
-          value
-        }
-      }
-      emission(limit: 1) {
-        data {
-          value
-        }
-        uid
-      }
-      validatorTrust(limit: 1) {
-        data {
-          value
-        }
-        uid
-      }
-      axons(limit: 1) {
-        data {
-          value
-        }
-        uid
-      }
-      active(limit: 1) {
-        data {
-          value
-        }
-        uid
-      }
-      lastUpdate(limit: 1) {
-        data {
-          value
-        }
-        uid
-      }
-      coldkey(limit: 1) {
-        data {
-          value
-        }
-        uid
-      }
-      validatorPermit {
-        data {
-          value
-        }
-        uid
-      }
-      hotkey {
-        key
-        uid
-      }
-    }
-    difficulty(limit: 1) {
-      value
-    }
-  }
-  totalIssuance(limit: 1) {
-    value
-    blockNumber
-  }
-}
-"""
 
 
 class MetagraphCommand:
@@ -180,7 +82,7 @@ class MetagraphCommand:
             response = requests.post(
                 url=API_URL,
                 json={
-                    "query": FETCH_SUBNETS_QUERY,
+                    "query": FETCH_METAGRAPH_QUERY,
                     "variables": {"netUid": cli.config.netuid},
                 },
             )

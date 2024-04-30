@@ -16,7 +16,13 @@
 # DEALINGS IN THE SOFTWARE.
 
 import argparse
+import requests
 import bittensor
+from bittensor.commands.queries import (
+    API_URL,
+    FETCH_HYPERPARAMETERS_QUERY,
+    TOTAL_NETWORKS_QUERY,
+)
 from . import defaults
 from rich.prompt import Prompt
 from rich.table import Table
@@ -461,22 +467,21 @@ class SubnetHyperparamsCommand:
     def run(cli: "bittensor.cli"):
         r"""View hyperparameters of a subnetwork."""
         try:
-            subtensor: "bittensor.subtensor" = bittensor.subtensor(
-                config=cli.config, log_verbose=False
+            response = requests.post(
+                url=API_URL,
+                json={
+                    "query": FETCH_HYPERPARAMETERS_QUERY,
+                    "variables": {"netUid": cli.config.netuid},
+                },
             )
-            SubnetHyperparamsCommand._run(cli, subtensor)
-        finally:
-            if "subtensor" in locals():
-                subtensor.close()
-                bittensor.logging.debug("closing subtensor connection")
+            hyperparams_data = response.json()["data"]["subnets"][0]
+            SubnetHyperparamsCommand._run(cli, hyperparams_data)
+        except Exception as e:
+            bittensor.logging.exception(f"An error occurred: {e}")
 
     @staticmethod
-    def _run(cli: "bittensor.cli", subtensor: "bittensor.subtensor"):
+    def _run(cli: "bittensor.cli", hyperparams_data):
         r"""View hyperparameters of a subnetwork."""
-        subnet: bittensor.SubnetHyperparameters = subtensor.get_subnet_hyperparameters(
-            cli.config.netuid
-        )
-
         table = Table(
             show_footer=True,
             width=cli.config.get("width", None),
@@ -484,14 +489,75 @@ class SubnetHyperparamsCommand:
             box=None,
             show_edge=True,
         )
-        table.title = "[white]Subnet Hyperparameters - NETUID: {} - {}".format(
-            cli.config.netuid, subtensor.network
+        table.title = "[white]Subnet Hyperparameters - NETUID: {} - finney".format(
+            cli.config.netuid, "finney"
         )
         table.add_column("[overline white]HYPERPARAMETER", style="bold white")
         table.add_column("[overline white]VALUE", style="green")
 
-        for param in subnet.__dict__:
-            table.add_row("  " + param, str(subnet.__dict__[param]))
+        table.add_row("  " + "rho", hyperparams_data["rho"][0]["value"])
+        table.add_row("  " + "kappa", hyperparams_data["kappa"][0]["value"])
+        table.add_row(
+            "  " + "immunity_period", hyperparams_data["immunityPeriod"][0]["value"]
+        )
+        table.add_row(
+            "  " + "min_allowed_weights",
+            hyperparams_data["minAllowedWeights"][0]["value"],
+        )
+        table.add_row(
+            "  " + "max_weight_limit", hyperparams_data["maxWeightsLimit"][0]["value"]
+        )
+        table.add_row("  " + "tempo", hyperparams_data["tempo"][0]["value"])
+        table.add_row(
+            "  " + "min_difficulty", hyperparams_data["minDifficulty"][0]["value"]
+        )
+        table.add_row(
+            "  " + "max_difficulty", hyperparams_data["maxDifficulty"][0]["value"]
+        )
+        table.add_row(
+            "  " + "weights_version", hyperparams_data["weightsVersionKey"][0]["value"]
+        )
+        table.add_row(
+            "  " + "weights_rate_limit",
+            hyperparams_data["weightsSetRateLimit"][0]["value"],
+        )
+        table.add_row(
+            "  " + "adjustment_interval",
+            hyperparams_data["adjustmentAlpha"][0]["value"],
+        )
+        table.add_row(
+            "  " + "activity_cutoff", hyperparams_data["activityCutoff"][0]["value"]
+        )
+        table.add_row(
+            "  " + "registration_allowed",
+            str(hyperparams_data["networkRegistrationAllowed"][0]["value"]),
+        )
+        table.add_row(
+            "  " + "target_regs_per_interval",
+            hyperparams_data["targetRegistrationsPerInterval"][0]["value"],
+        )
+        table.add_row("  " + "min_burn", hyperparams_data["minBurn"][0]["value"])
+        table.add_row("  " + "max_burn", hyperparams_data["maxBurn"][0]["value"])
+        table.add_row(
+            "  " + "bonds_moving_avg",
+            hyperparams_data["bondsMovingAverage"][0]["value"],
+        )
+        table.add_row(
+            "  " + "max_regs_per_block",
+            hyperparams_data["maxRegistrationsPerBlock"][0]["value"],
+        )
+        table.add_row(
+            "  " + "serving_rate_limit",
+            hyperparams_data["servingRateLimit"][0]["value"],
+        )
+        table.add_row(
+            "  " + "max_validators",
+            hyperparams_data["maxAllowedValidators"][0]["value"],
+        )
+        table.add_row(
+            "  " + "adjustment_alpha", hyperparams_data["adjustmentAlpha"][0]["value"]
+        )
+        table.add_row("  " + "difficulty", hyperparams_data["difficulty"][0]["value"])
 
         bittensor.__console__.print(table)
 
@@ -565,22 +631,21 @@ class SubnetGetHyperparamsCommand:
     def run(cli: "bittensor.cli"):
         r"""View hyperparameters of a subnetwork."""
         try:
-            subtensor: "bittensor.subtensor" = bittensor.subtensor(
-                config=cli.config, log_verbose=False
+            response = requests.post(
+                url=API_URL,
+                json={
+                    "query": FETCH_HYPERPARAMETERS_QUERY,
+                    "variables": {"netUid": cli.config.netuid},
+                },
             )
-            SubnetGetHyperparamsCommand._run(cli, subtensor)
-        finally:
-            if "subtensor" in locals():
-                subtensor.close()
-                bittensor.logging.debug("closing subtensor connection")
+            hyperparams_data = response.json()["data"]["subnets"][0]
+            SubnetHyperparamsCommand._run(cli, hyperparams_data)
+        except Exception as e:
+            bittensor.logging.exception(f"An error occurred: {e}")
 
     @staticmethod
-    def _run(cli: "bittensor.cli", subtensor: "bittensor.subtensor"):
+    def _run(cli: "bittensor.cli", hyperparams_data):
         r"""View hyperparameters of a subnetwork."""
-        subnet: bittensor.SubnetHyperparameters = subtensor.get_subnet_hyperparameters(
-            cli.config.netuid
-        )
-
         table = Table(
             show_footer=True,
             width=cli.config.get("width", None),
@@ -588,14 +653,75 @@ class SubnetGetHyperparamsCommand:
             box=None,
             show_edge=True,
         )
-        table.title = "[white]Subnet Hyperparameters - NETUID: {} - {}".format(
-            cli.config.netuid, subtensor.network
+        table.title = "[white]Subnet Hyperparameters - NETUID: {} - finney".format(
+            cli.config.netuid, "finney"
         )
-        table.add_column("[overline white]HYPERPARAMETER", style="white")
+        table.add_column("[overline white]HYPERPARAMETER", style="bold white")
         table.add_column("[overline white]VALUE", style="green")
 
-        for param in subnet.__dict__:
-            table.add_row(param, str(subnet.__dict__[param]))
+        table.add_row("  " + "rho", hyperparams_data["rho"][0]["value"])
+        table.add_row("  " + "kappa", hyperparams_data["kappa"][0]["value"])
+        table.add_row(
+            "  " + "immunity_period", hyperparams_data["immunityPeriod"][0]["value"]
+        )
+        table.add_row(
+            "  " + "min_allowed_weights",
+            hyperparams_data["minAllowedWeights"][0]["value"],
+        )
+        table.add_row(
+            "  " + "max_weight_limit", hyperparams_data["maxWeightsLimit"][0]["value"]
+        )
+        table.add_row("  " + "tempo", hyperparams_data["tempo"][0]["value"])
+        table.add_row(
+            "  " + "min_difficulty", hyperparams_data["minDifficulty"][0]["value"]
+        )
+        table.add_row(
+            "  " + "max_difficulty", hyperparams_data["maxDifficulty"][0]["value"]
+        )
+        table.add_row(
+            "  " + "weights_version", hyperparams_data["weightsVersionKey"][0]["value"]
+        )
+        table.add_row(
+            "  " + "weights_rate_limit",
+            hyperparams_data["weightsSetRateLimit"][0]["value"],
+        )
+        table.add_row(
+            "  " + "adjustment_interval",
+            hyperparams_data["adjustmentAlpha"][0]["value"],
+        )
+        table.add_row(
+            "  " + "activity_cutoff", hyperparams_data["activityCutoff"][0]["value"]
+        )
+        table.add_row(
+            "  " + "registration_allowed",
+            str(hyperparams_data["networkRegistrationAllowed"][0]["value"]),
+        )
+        table.add_row(
+            "  " + "target_regs_per_interval",
+            hyperparams_data["targetRegistrationsPerInterval"][0]["value"],
+        )
+        table.add_row("  " + "min_burn", hyperparams_data["minBurn"][0]["value"])
+        table.add_row("  " + "max_burn", hyperparams_data["maxBurn"][0]["value"])
+        table.add_row(
+            "  " + "bonds_moving_avg",
+            hyperparams_data["bondsMovingAverage"][0]["value"],
+        )
+        table.add_row(
+            "  " + "max_regs_per_block",
+            hyperparams_data["maxRegistrationsPerBlock"][0]["value"],
+        )
+        table.add_row(
+            "  " + "serving_rate_limit",
+            hyperparams_data["servingRateLimit"][0]["value"],
+        )
+        table.add_row(
+            "  " + "max_validators",
+            hyperparams_data["maxAllowedValidators"][0]["value"],
+        )
+        table.add_row(
+            "  " + "adjustment_alpha", hyperparams_data["adjustmentAlpha"][0]["value"]
+        )
+        table.add_row("  " + "difficulty", hyperparams_data["difficulty"][0]["value"])
 
         bittensor.__console__.print(table)
 

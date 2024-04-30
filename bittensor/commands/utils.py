@@ -23,19 +23,11 @@ from typing import List, Dict, Any, Optional
 from rich.prompt import Confirm, PromptBase
 import requests
 from dataclasses import dataclass
+
+from bittensor.commands.queries import API_URL, TOTAL_NETWORKS_QUERY
 from . import defaults
 
 console = bittensor.__console__
-
-API_URL = "https://api.taomarketcap.com/graphql"
-
-TOTAL_NETWORKS_QUERY = """
-query TotalNetworks {
-  totalNetworks(limit: 1) {
-    value
-  }
-}
-"""
 
 
 class IntListPrompt(PromptBase):
