@@ -46,28 +46,46 @@ class IntListPrompt(PromptBase):
         )
 
 
+def fetch_netuid(config, allow_none):
+    response = requests.post(url=API_URL, json={"query": TOTAL_NETWORKS_QUERY}).json()
+    total_networks = response["data"]["totalNetworks"][0]["value"]
+    all_netuids = [str(i) for i in range(int(total_networks))]
+    if len(all_netuids) == 0:
+        console.print(":cross_mark:[red]There are no open networks.[/red]")
+        sys.exit()
+    if not config.no_prompt:
+        netuid = IntListPrompt.ask(
+            "Enter netuid", choices=all_netuids, default=str(all_netuids[0])
+        )
+    else:
+        netuid = str(defaults.netuid) if not allow_none else "None"
+    return netuid
+
+
 def check_netuid_set(
     config: "bittensor.config",
-    subtensor: "bittensor.subtensor",
+    subtensor: "bittensor.subtensor" = None,
     allow_none: bool = False,
 ):
-    if subtensor.network != "nakamoto":
+    if subtensor is not None and subtensor.network != "nakamoto":
         # Make sure netuid is set.
         if not config.is_set("netuid"):
-            response = requests.post(
-                url=API_URL, json={"query": TOTAL_NETWORKS_QUERY}
-            ).json()
-            total_networks = response["data"]["totalNetworks"][0]["value"]
-            all_netuids = [str(i) for i in range(int(total_networks))]
-            if len(all_netuids) == 0:
-                console.print(":cross_mark:[red]There are no open networks.[/red]")
-                sys.exit()
-            if not config.no_prompt:
-                netuid = IntListPrompt.ask(
-                    "Enter netuid", choices=all_netuids, default=str(all_netuids[0])
-                )
-            else:
-                netuid = str(defaults.netuid) if not allow_none else "None"
+            netuid = fetch_netuid(config, allow_none)
+        else:
+            netuid = config.netuid
+
+        if isinstance(netuid, str) and netuid.lower() in ["none"] and allow_none:
+            config.netuid = None
+        else:
+            if isinstance(netuid, list):
+                netuid = netuid[0]
+            try:
+                config.netuid = int(netuid)
+            except:
+                raise ValueError('netuid must be an integer or "None" (if applicable)')
+    else:
+        if not config.is_set("netuid"):
+            netuid = fetch_netuid(config, allow_none)
         else:
             netuid = config.netuid
 
