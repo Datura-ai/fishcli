@@ -8,6 +8,35 @@ query TotalNetworks {
 }
 """
 
+FETCH_INSPECT_NEURONS = """
+query FetchSubnets($netUid: [Int!]!) {
+  subnets(netUid: $netUid) {
+    uids {
+      hotkey {
+        key
+        uid
+      }
+      coldkey(limit: 1) {
+        data {
+          value
+        }
+        uid
+      }
+      stake {
+        data {
+          value
+        }
+      }
+      emission(limit: 1) {
+        data {
+          value
+        }
+      }
+    }
+  }
+}
+"""
+
 FETCH_SUBNETS_VALUES_QUERY = """
 query FetchSubnetsValues {
   subnets {

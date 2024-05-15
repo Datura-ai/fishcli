@@ -46,10 +46,14 @@ class IntListPrompt(PromptBase):
         )
 
 
-def fetch_netuid(config, allow_none):
+def get_all_subnet_netuids():
     response = requests.post(url=API_URL, json={"query": TOTAL_NETWORKS_QUERY}).json()
     total_networks = response["data"]["totalNetworks"][0]["value"]
-    all_netuids = [str(i) for i in range(int(total_networks))]
+    return [str(i) for i in range(int(total_networks))]
+
+
+def fetch_netuid(config, allow_none):
+    all_netuids = get_all_subnet_netuids()
     if len(all_netuids) == 0:
         console.print(":cross_mark:[red]There are no open networks.[/red]")
         sys.exit()
