@@ -22,6 +22,9 @@ import sys
 from rich.prompt import Prompt, Confirm
 from rich.table import Table
 from typing import Optional, List, Tuple
+
+from bittensor.commands.queries import GET_WALLET_TRANSFERS
+from bittensor.commands.utils import call_gql
 from . import defaults
 import requests
 from ..utils import RAOPERTAO
@@ -988,9 +991,10 @@ class GetWalletHistoryCommand:
     def run(cli):
         r"""Check the transfer history of the provided wallet."""
         wallet = bittensor.wallet(config=cli.config)
-        wallet_address = wallet.get_coldkeypub().ss58_address
+        wallet_address = "5DD81Rs4HGLfpjz4Nh5ALdW3GD2iD2TTM3rJUmFPSTAfpcMp"
         # Fetch all transfers
-        transfers = get_wallet_transfers(wallet_address)
+        response = call_gql(GET_WALLET_TRANSFERS, {"coldkey": wallet_address})
+        transfers = response.json()["data"]["coldkey"]["transfers"]
 
         # Create output table
         table = create_transfer_history_table(transfers)
@@ -1045,7 +1049,6 @@ def create_transfer_history_table(transfers):
     table = Table(show_footer=False)
     # Define the column names
     column_names = [
-        "Id",
         "From",
         "To",
         "Amount (Tao)",
@@ -1083,13 +1086,12 @@ def create_transfer_history_table(transfers):
         except:
             tao_amount = item["amount"]
         table.add_row(
-            item["id"],
-            item["from"],
-            item["to"],
+            item["sender"],
+            item["receiver"],
             f"{tao_amount:.3f}",
-            str(item["extrinsicId"]),
-            item["blockNumber"],
-            f"{taostats_url_base}/{item['blockNumber']}-{item['extrinsicId']}",
+            str(item["extrinsicIdx"]),
+            str(item["blockNumber"]),
+            f"{taostats_url_base}/{item['blockNumber']}-{item['extrinsicIdx']}",
         )
     table.add_row()
     table.show_footer = True

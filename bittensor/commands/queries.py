@@ -8,6 +8,20 @@ query TotalNetworks {
 }
 """
 
+GET_WALLET_TRANSFERS = """
+query GetWalletTransfers($coldkey: String!){
+  coldkey(coldkey: $coldkey) {
+    transfers {
+      amount
+      sender
+      receiver
+      extrinsicIdx
+      blockNumber
+    }
+  }
+}
+"""
+
 FETCH_INSPECT_NEURONS = """
 query FetchSubnets($netUid: [Int!]!) {
   subnets(netUid: $netUid) {
