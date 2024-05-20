@@ -267,7 +267,7 @@ class MetagraphCommand:
 
     @staticmethod
     def check_config(config: "bittensor.config"):
-        pass
+        check_netuid_set(config)
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):
