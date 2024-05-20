@@ -991,7 +991,7 @@ class GetWalletHistoryCommand:
     def run(cli):
         r"""Check the transfer history of the provided wallet."""
         wallet = bittensor.wallet(config=cli.config)
-        wallet_address = "5DD81Rs4HGLfpjz4Nh5ALdW3GD2iD2TTM3rJUmFPSTAfpcMp"
+        wallet_address = wallet.get_coldkeypub().ss58_address
         # Fetch all transfers
         response = call_gql(GET_WALLET_TRANSFERS, {"coldkey": wallet_address})
         transfers = response.json()["data"]["coldkey"]["transfers"]
