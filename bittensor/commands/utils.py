@@ -17,6 +17,7 @@
 
 import sys
 import os
+import aiohttp
 import time
 import torch
 import bittensor
@@ -236,6 +237,16 @@ def call_gql(query: str, variables: dict = None) -> requests.Response:
         f"[yellow]GraphQL query execution time: {end_time - start_time} seconds"
     )
     return response
+
+
+async def call_gql_async(query: str, variables: dict = None):
+    url = API_URL
+    headers = {"Content-Type": "application/json"}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            url, json={"query": query, "variables": variables}, headers=headers
+        ) as response:
+            return await response.json()
 
 
 @dataclass

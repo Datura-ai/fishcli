@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import argparse
+import asyncio
 import bittensor
 from tqdm import tqdm
 from rich.table import Table
@@ -23,7 +24,7 @@ from rich.prompt import Prompt
 
 from bittensor.commands.queries import FETCH_INSPECT_NEURONS
 from .utils import (
-    call_gql,
+    call_gql_async,
     get_all_subnet_netuids,
     get_delegates_details,
     DelegatesDetails,
@@ -70,6 +71,20 @@ def _get_hotkey_wallets_for_wallet(wallet) -> List["bittensor.wallet"]:
         except Exception:
             pass
     return hotkey_wallets
+
+
+async def fetch_neuron_state(netuid):
+    neurons = await call_gql_async(FETCH_INSPECT_NEURONS, {"netUid": int(netuid)})
+    return netuid, (
+        neurons["data"]["subnets"][0] if neurons["data"]["subnets"][0] != None else []
+    )
+
+
+async def get_neuron_states_concurrently(netuids):
+    tasks = [fetch_neuron_state(netuid) for netuid in netuids]
+    results = await asyncio.gather(*tasks)
+    neuron_state_dict = {netuid: neurons for netuid, neurons in results}
+    return neuron_state_dict
 
 
 class InspectCommand:
@@ -152,12 +167,7 @@ class InspectCommand:
             registered_delegate_info = {}
 
         neuron_state_dict = {}
-        for netuid in tqdm(netuids):
-            neurons = call_gql(FETCH_INSPECT_NEURONS, {"netUid": int(netuid)}).json()[
-                "data"
-            ]["subnets"][0]
-            neuron_state_dict[netuid] = neurons if neurons != None else []
-
+        neuron_state_dict = asyncio.run(get_neuron_states_concurrently(netuids))
         table = Table(show_footer=True, pad_edge=False, box=None, expand=True)
         table.add_column(
             "[overline white]Coldkey", footer_style="overline white", style="bold white"
