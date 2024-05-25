@@ -16,14 +16,14 @@
 # DEALINGS IN THE SOFTWARE.
 
 import sys
-import os
 import aiohttp
 import time
-import torch
+import os
 import bittensor
+import requests
+from bittensor.utils.registration import torch
 from typing import List, Dict, Any, Optional
 from rich.prompt import Confirm, PromptBase
-import requests
 from dataclasses import dataclass
 
 from bittensor.commands.queries import API_URL, TOTAL_NETWORKS_QUERY
@@ -107,9 +107,9 @@ def check_netuid_set(
 
 def check_for_cuda_reg_config(config: "bittensor.config") -> None:
     """Checks, when CUDA is available, if the user would like to register with their CUDA device."""
-    if torch.cuda.is_available():
+    if torch and torch.cuda.is_available():
         if not config.no_prompt:
-            if config.pow_register.cuda.get("use_cuda") == None:  # flag not set
+            if config.pow_register.cuda.get("use_cuda") is None:  # flag not set
                 # Ask about cuda registration only if a CUDA device is available.
                 cuda = Confirm.ask("Detected CUDA device, use CUDA for registration?\n")
                 config.pow_register.cuda.use_cuda = cuda

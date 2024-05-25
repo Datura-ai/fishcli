@@ -35,7 +35,7 @@ from ..chain_data import (
     AxonInfo,
 )
 from ..errors import ChainQueryError
-from ..subtensor import subtensor
+from ..subtensor import Subtensor
 from ..utils import RAOPERTAO, U16_NORMALIZED_FLOAT
 from ..utils.balance import Balance
 from ..utils.registration import POWSolution
@@ -196,7 +196,7 @@ class MockChainState(TypedDict):
     SubtensorModule: MockSubtensorState
 
 
-class MockSubtensor(subtensor):
+class MockSubtensor(Subtensor):
     """
     A Mock Subtensor class for running tests.
     This should mock only methods that make queries to the chain.
@@ -1304,6 +1304,18 @@ class MockSubtensor(subtensor):
         ][self.block_number] = (bal + amount).rao
 
         return True
+
+    @staticmethod
+    def min_required_stake():
+        """
+        As the minimum required stake may change, this method allows us to dynamically
+        update the amount in the mock without updating the tests
+        """
+        # valid minimum threshold as of 2024/05/01
+        return 100_000_000  # RAO
+
+    def get_minimum_required_stake(self):
+        return Balance.from_rao(self.min_required_stake())
 
     def get_delegate_by_hotkey(
         self, hotkey_ss58: str, block: Optional[int] = None
