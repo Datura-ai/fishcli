@@ -16,13 +16,17 @@
 # DEALINGS IN THE SOFTWARE.
 
 import sys
+import aiohttp
+import time
 import os
-import torch
 import bittensor
+import requests
+from bittensor.utils.registration import torch
 from typing import List, Dict, Any, Optional
 from rich.prompt import Confirm, PromptBase
-import requests
 from dataclasses import dataclass
+
+from bittensor.commands.queries import API_URL, TOTAL_NETWORKS_QUERY
 from . import defaults
 
 console = bittensor.__console__
@@ -43,25 +47,50 @@ class IntListPrompt(PromptBase):
         )
 
 
+def get_all_subnet_netuids():
+    response = requests.post(url=API_URL, json={"query": TOTAL_NETWORKS_QUERY}).json()
+    total_networks = response["data"]["totalNetworks"][0]["value"]
+    return [str(i) for i in range(int(total_networks))]
+
+
+def fetch_netuid(config, allow_none):
+    all_netuids = get_all_subnet_netuids()
+    if len(all_netuids) == 0:
+        console.print(":cross_mark:[red]There are no open networks.[/red]")
+        sys.exit()
+    if not config.no_prompt:
+        netuid = IntListPrompt.ask(
+            "Enter netuid", choices=all_netuids, default=str(all_netuids[0])
+        )
+    else:
+        netuid = str(defaults.netuid) if not allow_none else "None"
+    return netuid
+
+
 def check_netuid_set(
     config: "bittensor.config",
-    subtensor: "bittensor.subtensor",
+    subtensor: "bittensor.subtensor" = None,
     allow_none: bool = False,
 ):
-    if subtensor.network != "nakamoto":
-        all_netuids = [str(netuid) for netuid in subtensor.get_subnets()]
-        if len(all_netuids) == 0:
-            console.print(":cross_mark:[red]There are no open networks.[/red]")
-            sys.exit()
-
+    if subtensor is not None and subtensor.network != "nakamoto":
         # Make sure netuid is set.
         if not config.is_set("netuid"):
-            if not config.no_prompt:
-                netuid = IntListPrompt.ask(
-                    "Enter netuid", choices=all_netuids, default=str(all_netuids[0])
-                )
-            else:
-                netuid = str(defaults.netuid) if not allow_none else "None"
+            netuid = fetch_netuid(config, allow_none)
+        else:
+            netuid = config.netuid
+
+        if isinstance(netuid, str) and netuid.lower() in ["none"] and allow_none:
+            config.netuid = None
+        else:
+            if isinstance(netuid, list):
+                netuid = netuid[0]
+            try:
+                config.netuid = int(netuid)
+            except:
+                raise ValueError('netuid must be an integer or "None" (if applicable)')
+    else:
+        if not config.is_set("netuid"):
+            netuid = fetch_netuid(config, allow_none)
         else:
             netuid = config.netuid
 
@@ -78,9 +107,9 @@ def check_netuid_set(
 
 def check_for_cuda_reg_config(config: "bittensor.config") -> None:
     """Checks, when CUDA is available, if the user would like to register with their CUDA device."""
-    if torch.cuda.is_available():
+    if torch and torch.cuda.is_available():
         if not config.no_prompt:
-            if config.pow_register.cuda.get("use_cuda") == None:  # flag not set
+            if config.pow_register.cuda.get("use_cuda") is None:  # flag not set
                 # Ask about cuda registration only if a CUDA device is available.
                 cuda = Confirm.ask("Detected CUDA device, use CUDA for registration?\n")
                 config.pow_register.cuda.use_cuda = cuda
@@ -192,6 +221,32 @@ def filter_netuids_by_registered_hotkeys(
         netuids.extend(netuids_with_registered_hotkeys)
 
     return list(set(netuids))
+
+
+def call_gql(query: str, variables: dict = None) -> requests.Response:
+    start_time = time.time()
+    response = requests.post(
+        url=API_URL,
+        json={
+            "query": query,
+            "variables": variables,
+        },
+    )
+    end_time = time.time()
+    bittensor.__console__.print(
+        f"[yellow]GraphQL query execution time: {end_time - start_time} seconds"
+    )
+    return response
+
+
+async def call_gql_async(query: str, variables: dict = None):
+    url = API_URL
+    headers = {"Content-Type": "application/json"}
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            url, json={"query": query, "variables": variables}, headers=headers
+        ) as response:
+            return await response.json()
 
 
 @dataclass

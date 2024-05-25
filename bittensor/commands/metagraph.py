@@ -16,9 +16,13 @@
 # DEALINGS IN THE SOFTWARE.
 
 import argparse
+import json
 import bittensor
 from rich.table import Table
-from .utils import check_netuid_set
+
+from bittensor.commands.queries import FETCH_METAGRAPH_QUERY
+from bittensor.utils import U16_NORMALIZED_FLOAT
+from .utils import call_gql, check_netuid_set
 
 console = bittensor.__console__  # type: ignore
 
@@ -70,84 +74,102 @@ class MetagraphCommand:
     """
 
     @staticmethod
-    def run(cli: "bittensor.cli"):
+    def run(cli):
         r"""Prints an entire metagraph."""
         try:
-            subtensor: "bittensor.subtensor" = bittensor.subtensor(
-                config=cli.config, log_verbose=False
-            )
-            MetagraphCommand._run(cli, subtensor)
-        finally:
-            if "subtensor" in locals():
-                subtensor.close()
-                bittensor.logging.debug("closing subtensor connection")
+            response = call_gql(FETCH_METAGRAPH_QUERY, {"netUid": cli.config["netuid"]})
+            metagraph_data = response.json()
+            MetagraphCommand._run(cli, metagraph_data)
+        except Exception as e:
+            bittensor.logging.exception(f"An error occurred: {e}")
 
-    def _run(cli: "bittensor.cli", subtensor: "bittensor.subtensor"):
+    def _run(cli, metagraph_data):
         r"""Prints an entire metagraph."""
         console = bittensor.__console__
-        console.print(
-            ":satellite: Syncing with chain: [white]{}[/white] ...".format(
-                cli.config.subtensor.network
-            )
-        )
-        metagraph: bittensor.metagraph = subtensor.metagraph(netuid=cli.config.netuid)
-        metagraph.save()
-        difficulty = subtensor.difficulty(cli.config.netuid)
-        subnet_emission = bittensor.Balance.from_tao(
-            subtensor.get_emission_value_by_subnet(cli.config.netuid)
-        )
-        total_issuance = bittensor.Balance.from_rao(subtensor.total_issuance().rao)
 
+        # TODO fix it
+        network = "finney"
+
+        difficulty = metagraph_data["data"]["subnets"][0]["difficulty"][0]["value"]
+        total_issuance = bittensor.Balance.from_rao(
+            int(metagraph_data["data"]["totalIssuance"][0]["value"])
+        )
+        uids = metagraph_data["data"]["subnets"][0]["uids"]
         TABLE_DATA = []
-        total_stake = 0.0
-        total_rank = 0.0
-        total_validator_trust = 0.0
-        total_trust = 0.0
-        total_consensus = 0.0
-        total_incentive = 0.0
-        total_dividends = 0.0
+        total_stake = 0
+        total_rank = 0
+        total_validator_trust = 0
+        total_trust = 0
+        total_consensus = 0
+        total_incentive = 0
+        total_dividends = 0
         total_emission = 0
-        for uid in metagraph.uids:
-            neuron = metagraph.neurons[uid]
-            ep = metagraph.axons[uid]
+        total_active = 0
+        for uid in uids["rank"]:
+            active = uids["active"][uid["uid"]]["data"][0]["value"]
+            axons = json.loads(uids["axons"][uid["uid"]]["data"][0]["value"])
+            stake = int(uids["stake"][uid["uid"]]["data"][0]["value"]) / 1000000000
             row = [
-                str(neuron.uid),
-                "{:.5f}".format(metagraph.total_stake[uid]),
-                "{:.5f}".format(metagraph.ranks[uid]),
-                "{:.5f}".format(metagraph.trust[uid]),
-                "{:.5f}".format(metagraph.consensus[uid]),
-                "{:.5f}".format(metagraph.incentive[uid]),
-                "{:.5f}".format(metagraph.dividends[uid]),
-                "{}".format(int(metagraph.emission[uid] * 1000000000)),
-                "{:.5f}".format(metagraph.validator_trust[uid]),
-                "*" if metagraph.validator_permit[uid] else "",
-                str((metagraph.block.item() - metagraph.last_update[uid].item())),
-                str(metagraph.active[uid].item()),
-                (
-                    ep.ip + ":" + str(ep.port)
-                    if ep.is_serving
-                    else "[yellow]none[/yellow]"
+                str(uid["uid"]),
+                "{:.5f}".format(stake),
+                "{:.5f}".format(
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["rank"][uid["uid"]]["data"][0]["value"])
+                    )
                 ),
-                ep.hotkey[:10],
-                ep.coldkey[:10],
+                "{:.5f}".format(
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["trust"][uid["uid"]]["data"][0]["value"])
+                    )
+                ),
+                "{:.5f}".format(
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["consensus"][uid["uid"]]["data"][0]["value"])
+                    )
+                ),
+                "{:.5f}".format(
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["incentive"][uid["uid"]]["data"][0]["value"])
+                    )
+                ),
+                "{:.5f}".format(
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["dividends"][uid["uid"]]["data"][0]["value"])
+                    )
+                ),
+                "{}".format(int(uids["emission"][uid["uid"]]["data"][0]["value"])),
+                "{:.5f}".format(
+                    U16_NORMALIZED_FLOAT(
+                        int(uids["validatorTrust"][uid["uid"]]["data"][0]["value"])
+                    )
+                ),
+                "*" if uids["validatorPermit"][uid["uid"]]["data"][0]["value"] else "",
+                str(uids["lastUpdate"][uid["uid"]]["data"][0]["value"]),
+                str(1 if active else 0),
+                ("{ip}:{port}".format(**axons) if axons else "[yellow]none[/yellow]"),
+                uids["hotkey"][uid["uid"]]["key"][:10],
+                uids["coldkey"][uid["uid"]]["data"][0]["value"][:10],
             ]
-            total_stake += metagraph.total_stake[uid]
-            total_rank += metagraph.ranks[uid]
-            total_validator_trust += metagraph.validator_trust[uid]
-            total_trust += metagraph.trust[uid]
-            total_consensus += metagraph.consensus[uid]
-            total_incentive += metagraph.incentive[uid]
-            total_dividends += metagraph.dividends[uid]
-            total_emission += int(metagraph.emission[uid] * 1000000000)
+            total_stake += stake
+            total_rank += int(uids["rank"][uid["uid"]]["data"][0]["value"])
+            total_validator_trust += int(
+                uids["validatorTrust"][uid["uid"]]["data"][0]["value"]
+            )
+            total_trust += int(uids["trust"][uid["uid"]]["data"][0]["value"])
+            total_consensus += int(uids["consensus"][uid["uid"]]["data"][0]["value"])
+            total_incentive += int(uids["incentive"][uid["uid"]]["data"][0]["value"])
+            total_dividends += int(uids["dividends"][uid["uid"]]["data"][0]["value"])
+            total_emission += int(uids["emission"][uid["uid"]]["data"][0]["value"])
+            total_active += 1 if active else 0
             TABLE_DATA.append(row)
-        total_neurons = len(metagraph.uids)
+        total_neurons = len(uids["rank"])
         table = Table(show_footer=False)
         table.title = "[white]Metagraph: net: {}:{}, block: {}, N: {}/{}, stake: {}, issuance: {}, difficulty: {}".format(
-            subtensor.network,
-            metagraph.netuid,
-            metagraph.block.item(),
-            sum(metagraph.active.tolist()),
-            metagraph.n.item(),
+            network,
+            cli.config["netuid"],
+            metagraph_data["data"]["totalIssuance"][0]["blockNumber"],
+            total_active,
+            len(uids["rank"]),
             bittensor.Balance.from_tao(total_stake),
             total_issuance,
             difficulty,
@@ -168,7 +190,7 @@ class MetagraphCommand:
         )
         table.add_column(
             "[overline white]RANK",
-            "{:.5f}".format(total_rank),
+            "{:.5f}".format(U16_NORMALIZED_FLOAT(total_rank)),
             footer_style="overline white",
             justify="right",
             style="green",
@@ -176,7 +198,7 @@ class MetagraphCommand:
         )
         table.add_column(
             "[overline white]TRUST",
-            "{:.5f}".format(total_trust),
+            "{:.5f}".format(U16_NORMALIZED_FLOAT(total_trust)),
             footer_style="overline white",
             justify="right",
             style="green",
@@ -184,7 +206,7 @@ class MetagraphCommand:
         )
         table.add_column(
             "[overline white]CONSENSUS",
-            "{:.5f}".format(total_consensus),
+            "{:.5f}".format(U16_NORMALIZED_FLOAT(total_consensus)),
             footer_style="overline white",
             justify="right",
             style="green",
@@ -192,7 +214,7 @@ class MetagraphCommand:
         )
         table.add_column(
             "[overline white]INCENTIVE",
-            "{:.5f}".format(total_incentive),
+            "{:.5f}".format(U16_NORMALIZED_FLOAT(total_incentive)),
             footer_style="overline white",
             justify="right",
             style="green",
@@ -200,7 +222,7 @@ class MetagraphCommand:
         )
         table.add_column(
             "[overline white]DIVIDENDS",
-            "{:.5f}".format(total_dividends),
+            "{:.5f}".format(U16_NORMALIZED_FLOAT(total_dividends)),
             footer_style="overline white",
             justify="right",
             style="green",
@@ -208,7 +230,7 @@ class MetagraphCommand:
         )
         table.add_column(
             "[overline white]EMISSION(\u03C1)",
-            "\u03C1{}".format(int(total_emission)),
+            "\u03C1{}".format(U16_NORMALIZED_FLOAT(total_emission)),
             footer_style="overline white",
             justify="right",
             style="green",
@@ -216,7 +238,7 @@ class MetagraphCommand:
         )
         table.add_column(
             "[overline white]VTRUST",
-            "{:.5f}".format(total_validator_trust),
+            "{:.5f}".format(U16_NORMALIZED_FLOAT(total_validator_trust)),
             footer_style="overline white",
             justify="right",
             style="green",
@@ -245,9 +267,7 @@ class MetagraphCommand:
 
     @staticmethod
     def check_config(config: "bittensor.config"):
-        check_netuid_set(
-            config, subtensor=bittensor.subtensor(config=config, log_verbose=False)
-        )
+        check_netuid_set(config)
 
     @staticmethod
     def add_args(parser: argparse.ArgumentParser):

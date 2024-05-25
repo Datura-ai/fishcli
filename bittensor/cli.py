@@ -16,6 +16,7 @@
 # DEALINGS IN THE SOFTWARE.
 
 import sys
+import time
 import shtab
 import argparse
 import bittensor
@@ -29,6 +30,7 @@ from .commands import (
     InspectCommand,
     ListCommand,
     ListDelegatesCommand,
+    ListDelegatesLiteCommand,
     MetagraphCommand,
     MyDelegatesCommand,
     NewColdkeyCommand,
@@ -51,6 +53,7 @@ from .commands import (
     RunFaucetCommand,
     SenateCommand,
     SetIdentityCommand,
+    SetTakeCommand,
     StakeCommand,
     StakeShow,
     SubnetGetHyperparamsCommand,
@@ -121,10 +124,12 @@ COMMANDS = {
             "senate": SenateCommand,
             "register": RootRegisterCommand,
             "proposals": ProposalsCommand,
+            "set_take": SetTakeCommand,
             "delegate": DelegateStakeCommand,
             "undelegate": DelegateUnstakeCommand,
             "my_delegates": MyDelegatesCommand,
             "list_delegates": ListDelegatesCommand,
+            "list_delegates_lite": ListDelegatesLiteCommand,
             "nominate": NominateCommand,
         },
     },
@@ -226,7 +231,8 @@ class cli:
         """
         # Turns on console for cli.
         bittensor.turn_console_on()
-
+        global start_time
+        start_time = time.time()
         # If no config is provided, create a new one from args.
         if config is None:
             config = cli.create_config(args)
@@ -246,8 +252,8 @@ class cli:
         # If no_version_checking is not set or set as False in the config, version checking is done.
         if not self.config.get("no_version_checking", d=True):
             try:
-                bittensor.utils.version_checking()
-            except:
+                bittensor.utils.check_version()
+            except bittensor.utils.VersionCheckError:
                 # If version checking fails, inform user with an exception.
                 raise RuntimeError(
                     "To avoid internet-based version checking, pass --no_version_checking while running the CLI."
@@ -329,7 +335,7 @@ class cli:
             command_data = COMMANDS[command]
 
             if isinstance(command_data, dict):
-                if config["subcommand"] != None:
+                if config["subcommand"] is not None:
                     command_data["commands"][config["subcommand"]].check_config(config)
                 else:
                     console.print(
@@ -368,3 +374,7 @@ class cli:
                 f":cross_mark:[red]Unknown command: {self.config.command}[/red]"
             )
             sys.exit()
+        end_time = time.time()
+        bittensor.__console__.print(
+            f"[yellow]Command execution time: {end_time - start_time} seconds"
+        )

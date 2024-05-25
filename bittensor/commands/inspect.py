@@ -16,11 +16,16 @@
 # DEALINGS IN THE SOFTWARE.
 
 import argparse
+import asyncio
 import bittensor
 from tqdm import tqdm
 from rich.table import Table
 from rich.prompt import Prompt
+
+from bittensor.commands.queries import FETCH_INSPECT_NEURONS
 from .utils import (
+    call_gql_async,
+    get_all_subnet_netuids,
     get_delegates_details,
     DelegatesDetails,
     get_hotkey_wallets_for_wallet,
@@ -66,6 +71,20 @@ def _get_hotkey_wallets_for_wallet(wallet) -> List["bittensor.wallet"]:
         except Exception:
             pass
     return hotkey_wallets
+
+
+async def fetch_neuron_state(netuid):
+    neurons = await call_gql_async(FETCH_INSPECT_NEURONS, {"netUid": int(netuid)})
+    return netuid, (
+        neurons["data"]["subnets"][0] if neurons["data"]["subnets"][0] != None else []
+    )
+
+
+async def get_neuron_states_concurrently(netuids):
+    tasks = [fetch_neuron_state(netuid) for netuid in netuids]
+    results = await asyncio.gather(*tasks)
+    neuron_state_dict = {netuid: neurons for netuid, neurons in results}
+    return neuron_state_dict
 
 
 class InspectCommand:
@@ -132,15 +151,15 @@ class InspectCommand:
             wallets = [bittensor.wallet(config=cli.config)]
             all_hotkeys = get_hotkey_wallets_for_wallet(wallets[0])
 
-        netuids = subtensor.get_all_subnet_netuids()
+        netuids = get_all_subnet_netuids()
         netuids = filter_netuids_by_registered_hotkeys(
             cli, subtensor, netuids, all_hotkeys
         )
         bittensor.logging.debug(f"Netuids to check: {netuids}")
 
-        registered_delegate_info: Optional[
-            Dict[str, DelegatesDetails]
-        ] = get_delegates_details(url=bittensor.__delegates_details_url__)
+        registered_delegate_info: Optional[Dict[str, DelegatesDetails]] = (
+            get_delegates_details(url=bittensor.__delegates_details_url__)
+        )
         if registered_delegate_info is None:
             bittensor.__console__.print(
                 ":warning:[yellow]Could not get delegate info from chain.[/yellow]"
@@ -148,10 +167,7 @@ class InspectCommand:
             registered_delegate_info = {}
 
         neuron_state_dict = {}
-        for netuid in tqdm(netuids):
-            neurons = subtensor.neurons_lite(netuid)
-            neuron_state_dict[netuid] = neurons if neurons != None else []
-
+        neuron_state_dict = asyncio.run(get_neuron_states_concurrently(netuids))
         table = Table(show_footer=True, pad_edge=False, box=None, expand=True)
         table.add_column(
             "[overline white]Coldkey", footer_style="overline white", style="bold white"
@@ -181,9 +197,9 @@ class InspectCommand:
             "[overline white]Emission", footer_style="overline white", style="green"
         )
         for wallet in tqdm(wallets):
-            delegates: List[
-                Tuple(bittensor.DelegateInfo, bittensor.Balance)
-            ] = subtensor.get_delegated(coldkey_ss58=wallet.coldkeypub.ss58_address)
+            delegates: List[Tuple(bittensor.DelegateInfo, bittensor.Balance)] = (
+                subtensor.get_delegated(coldkey_ss58=wallet.coldkeypub.ss58_address)
+            )
             if not wallet.coldkeypub_file.exists_on_device():
                 continue
             cold_balance = subtensor.get_balance(wallet.coldkeypub.ss58_address)
@@ -210,15 +226,21 @@ class InspectCommand:
 
             hotkeys = _get_hotkey_wallets_for_wallet(wallet)
             for netuid in netuids:
-                for neuron in neuron_state_dict[netuid]:
-                    if neuron.coldkey == wallet.coldkeypub.ss58_address:
+                for neuron in neuron_state_dict[netuid]["uids"]["coldkey"]:
+                    uid = neuron["uid"]
+                    hot_key = neuron_state_dict[netuid]["uids"]["hotkey"][uid]["key"]
+                    if (
+                        neuron_state_dict[netuid]["uids"]["coldkey"][uid]["data"][0][
+                            "value"
+                        ]
+                        == wallet.coldkeypub.ss58_address
+                    ):
                         hotkey_name: str = ""
 
                         hotkey_names: List[str] = [
                             wallet.hotkey_str
                             for wallet in filter(
-                                lambda hotkey: hotkey.hotkey.ss58_address
-                                == neuron.hotkey,
+                                lambda hotkey: hotkey.hotkey.ss58_address == hot_key,
                                 hotkeys,
                             )
                         ]
@@ -232,11 +254,27 @@ class InspectCommand:
                             "",
                             "",
                             str(netuid),
-                            f"{hotkey_name}{neuron.hotkey}",
-                            str(neuron.stake),
-                            str(bittensor.Balance.from_tao(neuron.emission)),
+                            f"{hotkey_name}{hot_key}",
+                            str(
+                                bittensor.Balance.from_tao(
+                                    int(
+                                        neuron_state_dict[netuid]["uids"]["stake"][uid][
+                                            "data"
+                                        ][0]["value"]
+                                    )
+                                    / 1000000000
+                                )
+                            ),
+                            str(
+                                bittensor.Balance.from_rao(
+                                    int(
+                                        neuron_state_dict[netuid]["uids"]["emission"][
+                                            uid
+                                        ]["data"][0]["value"]
+                                    )
+                                )
+                            ),
                         )
-
         bittensor.__console__.print(table)
 
     @staticmethod
